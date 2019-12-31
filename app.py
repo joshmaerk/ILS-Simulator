@@ -15,4 +15,4 @@ def load_data():
     return json.loads(f)
 
 if __name__ == '__main__':
-    app.run()
+    serve(app, host='0.0.0.0', port=8000)

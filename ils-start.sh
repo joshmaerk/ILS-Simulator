@@ -1,3 +1,2 @@
-cd '.\OneDrive - Digital Consulting - Joshua Märker\P_Privat\010_WebProjekte\ILS-Simulator'
-.\Scripts\activate
-python app.py
+source env\bin\activate
+python3 app.py
