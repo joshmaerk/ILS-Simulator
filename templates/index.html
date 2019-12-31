@@ -33,9 +33,9 @@
         <div class="row">
             <!--Schalter -->
             {% for elem in data %}
-                <div class="col-2 pl-0 pr-0 border rounded-sm shadow-sm primary" onclick="colorchange({{ elem.id }})">
-                <div class="col">
-                    <p class="text-center font-weight-bold text-muted align-middle mt-4">{{ elem.label }}</p>
+                <div class="col-2 pl-0 pr-0 mt-2 mb-2 border rounded-sm shadow-sm primary" onclick="colorchange({{ elem.id }})">
+                <div class="col p-0 m-0">
+                    <p class="text-center font-weight-bold text-muted align-middle mt-1 mb-1">{{ elem.label }}</p>
                 </div>
                 <div class="col status_code mb-0 pl-0 pr-0">
                     <p class="mb-0" id="{{ elem.id }}" style="background-color: rgb(235, 52, 52);min-height: 1em;min-width: 100%;"
