@@ -1,0 +1,55 @@
+# IBCS Feedback Agent — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# ---------------------------------------------------------------------------
+# Azure AI Foundry & Azure Identity
+# ---------------------------------------------------------------------------
+azure-ai-projects>=1.0.0b4
+azure-identity>=1.16.0
+
+# ---------------------------------------------------------------------------
+# Azure OpenAI (GPT-4o Vision)
+# ---------------------------------------------------------------------------
+openai>=1.30.0
+
+# ---------------------------------------------------------------------------
+# File Processing
+# ---------------------------------------------------------------------------
+# PowerPoint
+python-pptx>=0.6.23
+
+# PDF (text extraction)
+pdfplumber>=0.11.0
+
+# PDF (rendering to images — requires poppler-utils system package)
+# Ubuntu/Debian: sudo apt-get install poppler-utils
+# macOS: brew install poppler
+pdf2image>=1.17.0
+
+# Excel
+openpyxl>=3.1.2
+
+# ---------------------------------------------------------------------------
+# Image Processing (slide/page rendering)
+# ---------------------------------------------------------------------------
+Pillow>=10.0.0
+
+# Optional: PyMuPDF (faster PDF rendering, fallback if pdf2image fails)
+# PyMuPDF>=1.24.0
+
+# ---------------------------------------------------------------------------
+# Data Validation & Serialization
+# ---------------------------------------------------------------------------
+pydantic>=2.6.0
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+python-dotenv>=1.0.0
+PyYAML>=6.0.1
+
+# ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
+# Type stubs (development only, not required at runtime)
+# types-PyYAML>=6.0.12
