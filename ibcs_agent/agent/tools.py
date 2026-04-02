@@ -369,7 +369,7 @@ def get_ibcs_rule_details(rule_id: str) -> str:
         "name": rule.name,
         "description": rule.description,
         "check_type": rule.check_type,
-        "default_severity": rule.severity,
+        "severity": rule.severity,
         "violation_hint": rule.violation_hint,
         "suggestion": rule.suggestion_template,
         "applies_to": rule.applies_to,

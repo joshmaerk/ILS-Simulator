@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from openpyxl import load_workbook
+from ibcs_agent.processors.excel_table_metadata import SheetTableMetadata, extract_table_metadata
 from openpyxl.chart import (
     AreaChart,
     BarChart,
@@ -82,6 +83,7 @@ class SheetData:
     col_count: int
     font_sizes_pt: List[float]
     image_base64: Optional[str] = None
+    table_metadata: Optional[SheetTableMetadata] = None
 
 
 @dataclass
@@ -297,7 +299,7 @@ def process_excel(
         if render_images:
             image_b64 = _render_sheet_placeholder(ws.title)
 
-        sheets_data.append(SheetData(
+        sheet_data = SheetData(
             sheet_index=sheet_idx,
             sheet_name=ws.title,
             title=title,
@@ -309,7 +311,12 @@ def process_excel(
             col_count=ws.max_column or 0,
             font_sizes_pt=font_sizes,
             image_base64=image_b64,
-        ))
+        )
+        try:
+            sheet_data.table_metadata = extract_table_metadata(ws)
+        except Exception as e:
+            logger.warning(f"Could not extract table metadata for '{ws.title}': {e}")
+        sheets_data.append(sheet_data)
 
     return ExcelProcessingResult(
         file_name=file_name,

@@ -103,9 +103,18 @@ def _load_from_env() -> AppConfig:
     return cfg
 
 
+_AZURE_DEFAULTS = AzureConfig()
+_ANALYSIS_DEFAULTS = AnalysisConfig()
+
+
 def _load_from_yaml(path: str) -> AppConfig:
-    """Build config from a YAML file, then override with env vars."""
-    cfg = _load_from_env()  # Start with env vars as base
+    """Build config from a YAML file.
+
+    Priority: explicit env vars (non-default values) > YAML > class defaults.
+    An env var is considered "explicit" when its value differs from the class default,
+    which allows YAML to override test/CI defaults that happen to equal the class default.
+    """
+    cfg = AppConfig()  # Start with class defaults
 
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
@@ -144,6 +153,29 @@ def _load_from_yaml(path: str) -> AppConfig:
 
     if "log_level" in data:
         cfg.log_level = data["log_level"]
+
+    # Apply env vars that differ from the class default (explicit overrides win over YAML)
+    _e = os.getenv
+    if (v := _e("AZURE_AI_FOUNDRY_CONNECTION_STRING")) is not None and v != _AZURE_DEFAULTS.connection_string:
+        cfg.azure.connection_string = v
+    if (v := _e("AZURE_OPENAI_ENDPOINT")) is not None and v != _AZURE_DEFAULTS.openai_endpoint:
+        cfg.azure.openai_endpoint = v
+    if (v := _e("AZURE_OPENAI_API_KEY")) is not None and v != _AZURE_DEFAULTS.openai_api_key:
+        cfg.azure.openai_api_key = v
+    if (v := _e("AZURE_OPENAI_MODEL_NAME")) is not None and v != _AZURE_DEFAULTS.model_name:
+        cfg.azure.model_name = v
+    if (v := _e("AGENT_NAME")) is not None and v != _AZURE_DEFAULTS.agent_name:
+        cfg.azure.agent_name = v
+    if (v := _e("ENABLE_VISUAL_ANALYSIS")) is not None:
+        env_vis = v.lower() == "true"
+        if env_vis != _ANALYSIS_DEFAULTS.enable_visual_analysis:
+            cfg.analysis.enable_visual_analysis = env_vis
+    if (v := _e("MAX_PAGES_PER_FILE")) is not None:
+        env_pages = int(v)
+        if env_pages != _ANALYSIS_DEFAULTS.max_pages_per_file:
+            cfg.analysis.max_pages_per_file = env_pages
+    if (v := _e("LOG_LEVEL")) is not None and v != "INFO":
+        cfg.log_level = v
 
     return cfg
 

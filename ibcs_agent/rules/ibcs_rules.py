@@ -480,7 +480,7 @@ STRUCTURE_RULES: List[IBCSRule] = [
 # ---------------------------------------------------------------------------
 # All rules combined
 # ---------------------------------------------------------------------------
-ALL_RULES: List[IBCSRule] = (
+ALL_RULES: List[IBCSRule] = list(
     SAY_RULES
     + UNIFY_RULES
     + CONDENSE_RULES
@@ -496,6 +496,47 @@ for _rule in ALL_RULES:
     RULES_BY_CATEGORY.setdefault(_rule.category, []).append(_rule)
 
 SUCCESS_CATEGORIES = ["SAY", "UNIFY", "CONDENSE", "CHECK", "EXPRESS", "SIMPLIFY", "STRUCTURE"]
+
+# Import and merge table-specific rules
+# Uses sys.modules to avoid circular import: if ibcs_rules_tables is already
+# being loaded (circular), we skip. The merge will be retried lazily via
+# ensure_table_rules_merged() which is called by get_rule() and other accessors.
+_TABLE_RULES_MERGED: bool = False
+
+
+def _try_merge_table_rules() -> bool:
+    """Try to merge table rules. Returns True if successful."""
+    global ALL_RULES, RULES_BY_ID, RULES_BY_CATEGORY, _TABLE_RULES_MERGED
+    if _TABLE_RULES_MERGED:
+        return True
+    import sys
+    # Check if ibcs_rules_tables is fully loaded (not mid-import)
+    _tbl_mod = sys.modules.get("ibcs_agent.rules.ibcs_rules_tables")
+    if _tbl_mod is None:
+        # Not yet imported - try to import it now
+        try:
+            import importlib
+            _tbl_mod = importlib.import_module("ibcs_agent.rules.ibcs_rules_tables")
+        except Exception:
+            return False
+    _table_rules = getattr(_tbl_mod, "ALL_TABLE_RULES", None)
+    if not _table_rules:
+        return False  # Module partially loaded (circular) - try later
+    # Check if already merged
+    if _table_rules[0].id in RULES_BY_ID:
+        _TABLE_RULES_MERGED = True
+        return True
+    # Merge in-place so existing references to ALL_RULES see the update
+    ALL_RULES.extend(_table_rules)
+    RULES_BY_ID.update({rule.id: rule for rule in _table_rules})
+    for _rule in _table_rules:
+        RULES_BY_CATEGORY.setdefault(_rule.category, []).append(_rule)
+    _TABLE_RULES_MERGED = True
+    return True
+
+
+# Attempt immediate merge at module load time
+_try_merge_table_rules()
 
 
 def get_rule(rule_id: str) -> IBCSRule:

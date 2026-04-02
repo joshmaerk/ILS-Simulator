@@ -44,7 +44,7 @@ EXTENSION_TO_TYPE = {
     "xls": "xlsx",
 }
 
-MAX_FILENAME_LENGTH = 255
+MAX_FILENAME_LENGTH = 200
 SAFE_FILENAME_PATTERN = re.compile(r"^[\w\-. ]+$")
 
 

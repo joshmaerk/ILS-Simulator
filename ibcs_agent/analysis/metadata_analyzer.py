@@ -332,6 +332,15 @@ def analyze_excel_metadata(processing_result: Any) -> List[List[RuleViolation]]:
             violations.extend(check_3d_chart(chart.is_3d, chart.chart_type, chart_label))
             violations.extend(check_pie_chart(chart.chart_type, chart.series_count, chart_label))
 
+        # Deep table analysis using SheetTableMetadata
+        if hasattr(sheet, 'table_metadata') and sheet.table_metadata is not None:
+            try:
+                from ibcs_agent.analysis.excel_table_analyzer import analyze_sheet_table
+                table_violations = analyze_sheet_table(sheet.table_metadata, sheet_label)
+                violations.extend(table_violations)
+            except Exception:
+                pass
+
         per_sheet_violations.append(violations)
 
     return per_sheet_violations
