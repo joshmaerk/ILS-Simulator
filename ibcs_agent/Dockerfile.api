@@ -1,0 +1,46 @@
+# syntax=docker/dockerfile:1
+# ---------------------------------------------------------------------------
+# IBCS Feedback Agent – REST API container
+# Build:   docker build -f Dockerfile.api -t ibcs-feedback-api .
+# Run:     docker run -p 8000:8000 --env-file .env ibcs-feedback-api
+# ---------------------------------------------------------------------------
+
+FROM python:3.11-slim AS base
+
+# System dependencies
+#   poppler-utils  → pdf2image (PDF page rendering)
+#   libmagic1      → python-magic (file type validation)
+#   libgl1         → OpenCV (optional image processing)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils \
+    libmagic1 \
+    libgl1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# ---- Python dependencies (cached layer) ----------------------------------
+COPY requirements.txt requirements-api.txt ./
+RUN pip install --no-cache-dir \
+    -r requirements.txt \
+    -r requirements-api.txt
+
+# ---- Application code ----------------------------------------------------
+COPY . .
+
+# Non-root user for security
+RUN useradd --create-home --shell /bin/bash appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+
+# 2 workers: keeps memory predictable (~500 MB each for PPTX/PDF loads = ~1 GB)
+# Scale horizontally via Container Apps HTTP scaling rule instead.
+# --timeout-keep-alive 65: slightly above Azure Load Balancer's 60 s idle timeout.
+CMD ["uvicorn", "ibcs_agent.api.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "2", \
+     "--timeout-keep-alive", "65", \
+     "--log-config", "/dev/null"]

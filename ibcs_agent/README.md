@@ -146,35 +146,185 @@ python -m ibcs_agent.agent.agent interactive asst_xxx
 
 ## Microsoft Copilot Studio Integration
 
-### Voraussetzung
-Der Agent läuft als Azure AI Foundry Agent und ist über eine REST API erreichbar.
+Der Agent wird als REST API (FastAPI) deployt und über einen **Custom Connector** in Enterprise Copilot Studio eingebunden.
 
-### Schritte
+---
 
-1. **Agent deployen** (siehe Schnellstart Schritt 4)
+### Phase 1 – REST API starten (lokal testen)
 
-2. **In Copilot Studio: Custom Connector erstellen**
-   - Copilot Studio → Settings → Custom Connectors → New Connector
-   - Ziel: Azure AI Foundry REST API Endpoint
-   - Authentication: API Key oder Azure AD
-
-3. **Action definieren**: `Analyze IBCS File`
-   - Input: Datei als base64-String + Dateiname
-   - Tool: `analyze_file`
-   - Output: IBCSFeedbackReport JSON
-
-4. **Topic erstellen**: "IBCS Datei analysieren"
-   - Trigger: "Analysiere meine Präsentation" / "IBCS Check" / Datei-Upload
-   - Action: Custom Connector → Analyze IBCS File
-   - Response: Formatiertes Feedback aus JSON
-
-### Copilot Studio Power Fx (Beispiel)
+```bash
+cd ibcs_agent
+pip install -r requirements.txt -r requirements-api.txt
+uvicorn ibcs_agent.api.main:app --reload --port 8000
 ```
-Set(varReport, IBCSConnector.AnalyzeFile({
-    file_content_base64: varFileBase64,
-    file_name: varFileName
-}));
+
+Verfügbare Endpunkte:
+
+| Methode | Pfad | Beschreibung |
+|---------|------|--------------|
+| `GET` | `/health` | Health Check (Liveness/Readiness Probe) |
+| `POST` | `/v1/analyze-file` | Datei analysieren → `IBCSFeedbackReport` |
+| `GET` | `/v1/rules` | Alle IBCS-Regeln abrufen |
+| `GET` | `/v1/rules/{rule_id}` | Details zu einer Regel |
+| `GET` | `/openapi.json` | OpenAPI 3.0 Spec (für Connector-Import) |
+| `GET` | `/docs` | Swagger UI |
+
+---
+
+### Phase 2 – Container bauen & auf Azure Container Apps deployen
+
+```bash
+# 1. Container bauen
+docker build -f Dockerfile.api -t ibcs-feedback-api .
+
+# 2. In ACR pushen
+az acr login --name <ACR_NAME>
+docker tag ibcs-feedback-api <ACR_NAME>.azurecr.io/ibcs-feedback-api:latest
+docker push <ACR_NAME>.azurecr.io/ibcs-feedback-api:latest
+
+# 3. Container App deployen (Platzhalter in container-app.yaml vorher befüllen)
+az containerapp create \
+  --yaml ibcs_agent/container-app.yaml \
+  -g <RESOURCE_GROUP> \
+  --environment <CONTAINER_APPS_ENV>
 ```
+
+Notiere die **HTTPS-URL** der Container App (z.B. `https://ibcs-feedback-api.xxx.germanywestcentral.azurecontainerapps.io`).
+
+---
+
+### Phase 3 – Azure AD App Registrations anlegen
+
+**3a. App Registration für die API**
+
+1. Azure Portal → Azure Active Directory → App-Registrierungen → Neue Registrierung
+2. Name: `ibcs-feedback-api-app`
+3. Unterstützte Kontotypen: *Nur Konten in diesem Organisationsverzeichnis*
+4. Redirect URI: leer lassen
+5. Nach Erstellung: **Anwendungs-ID (Client-ID)** notieren → `API_APP_CLIENT_ID`
+6. API verfügbar machen → Application ID URI: `api://<API_APP_CLIENT_ID>`
+7. Bereich hinzufügen: `analyze` (Anzeigename: "IBCS Datei analysieren")
+
+**3b. App Registration für den Connector**
+
+1. Neue Registrierung: `copilot-studio-ibcs-connector`
+2. **Anwendungs-ID** notieren → `CONNECTOR_CLIENT_ID`
+3. Zertifikate & Geheimnisse → Neues Clientgeheimnis → Wert notieren → `CONNECTOR_CLIENT_SECRET`
+4. API-Berechtigungen → Berechtigung hinzufügen → Eigene APIs → `ibcs-feedback-api-app` → `analyze` → Delegiert → Administratorzustimmung erteilen
+
+---
+
+### Phase 4 – Custom Connector in Power Platform anlegen
+
+1. **make.powerautomate.com** → Daten → Benutzerdefinierte Connectors → **+ Neuer benutzerdefinierter Connector** → OpenAPI-Datei importieren
+
+2. OpenAPI-Datei exportieren:
+   ```bash
+   curl https://<DEINE-URL>/openapi.json -o ibcs_openapi.json
+   ```
+   → Datei hochladen
+
+3. **Allgemein** Tab:
+   - Beschreibung: *IBCS Feedback Agent – analysiert PPT/PDF/Excel auf IBCS-Konformität*
+   - Schema: HTTPS
+   - Host: `<DEINE-URL>` (ohne `https://`)
+
+4. **Sicherheit** Tab:
+   - Authentifizierungstyp: **OAuth 2.0**
+   - Identitätsanbieter: **Azure Active Directory**
+   - Client-ID: `<CONNECTOR_CLIENT_ID>`
+   - Geheimer Clientschlüssel: `<CONNECTOR_CLIENT_SECRET>`
+   - Ressourcen-URL: `api://<API_APP_CLIENT_ID>`
+   - Bereich: leer lassen (wird automatisch ausgefüllt)
+
+5. **Definition** Tab – folgende 3 Aktionen müssen erscheinen:
+   - `analyzeFile` – POST /v1/analyze-file
+   - `listRules` – GET /v1/rules
+   - `getRuleDetails` – GET /v1/rules/{rule_id}
+
+6. **Connector erstellen** → **Testen** → Neue Verbindung → Anmelden → `GET /v1/rules` testen → JSON-Array erwartet
+
+---
+
+### Phase 5 – Topic in Copilot Studio anlegen
+
+1. **copilotstudio.microsoft.com** → Deinen Bot öffnen → Themen → **+ Neues Thema**
+2. Name: *IBCS Datei analysieren*
+3. Triggerphrasen:
+   - "Analysiere meine Präsentation"
+   - "IBCS Check"
+   - "Prüfe meine Datei auf IBCS"
+   - "Foliensatz prüfen"
+
+4. **Frageknoten** hinzufügen:
+   - Frage: "Bitte lade deine Datei hoch (PPTX, PDF oder Excel)."
+   - Variable: `varDatei` (Typ: Datei / Anhang)
+
+5. **Aktionsknoten** hinzufügen:
+   - Aktion: Benutzerdefinierter Connector → **IBCS Feedback Agent** → `analyzeFile`
+   - Eingaben:
+     - `file_content_base64` ← `System.Activity.Attachments.First().content`
+     - `file_name` ← `System.Activity.Attachments.First().name`
+   - Ausgabe speichern in: `varReport`
+
+6. **Nachrichtenknoten** hinzufügen (Ergebnis anzeigen):
+   ```
+   Dein IBCS-Report für „{varReport.file_name}":
+   Note: {varReport.overall_grade} | Score: {varReport.overall_score * 100}%
+   Verstöße: {varReport.total_violations} ({varReport.total_errors} Fehler, {varReport.total_warnings} Warnungen)
+   
+   {varReport.summary}
+   ```
+
+7. Optional – Detailtabelle mit **Adaptive Card**:
+   ```json
+   {
+     "type": "AdaptiveCard",
+     "body": [
+       {"type": "TextBlock", "text": "Top-Verstöße", "weight": "Bolder"},
+       {"type": "FactSet", "facts": [
+         {"title": "{varReport.top_violations[0].rule_id}", "value": "{varReport.top_violations[0].description}"}
+       ]}
+     ]
+   }
+   ```
+
+---
+
+### Power Fx Beispiel (Power Apps / Canvas App)
+
+```
+// Datei analysieren und Report speichern
+Set(
+  varReport,
+  IBCSConnector.analyzeFile({
+    file_content_base64: First(varDateiUpload).Value,
+    file_name: First(varDateiUpload).Name
+  })
+);
+
+// Note anzeigen
+Notify(
+  Concatenate("IBCS Note: ", varReport.overall_grade, " (", Text(varReport.overall_score * 100, "[$-de-DE]0"), "%)"),
+  NotificationType.Success
+)
+```
+
+---
+
+### Umgebungsvariablen (Produktiv)
+
+| Variable | Pflicht | Beschreibung |
+|---|---|---|
+| `AZURE_OPENAI_ENDPOINT` | Ja | GPT-4o Endpoint |
+| `AZURE_OPENAI_API_KEY` | Ja | GPT-4o API-Key |
+| `AZURE_OPENAI_MODEL_NAME` | Ja | Deployment-Name (z.B. `gpt-4o`) |
+| `AZURE_AD_TENANT_ID` | Prod | AAD Tenant-ID für JWT-Validierung |
+| `AZURE_AD_CLIENT_ID` | Prod | Client-ID der API App Registration |
+| `API_BASE_URL` | Empfohlen | HTTPS-URL der Container App (für OpenAPI `servers`) |
+| `ENABLE_VISUAL_ANALYSIS` | Nein | `true`/`false`, Standard: `true` |
+| `MAX_FILE_SIZE_MB` | Nein | Standard: `20` (Power Platform Limit) |
+| `LOG_LEVEL` | Nein | Standard: `INFO` |
 
 ---
 

@@ -1,0 +1,100 @@
+# Azure Container Apps deployment manifest
+# =========================================
+# Deploy:
+#   az containerapp create \
+#     --yaml container-app.yaml \
+#     -g <resource-group> \
+#     --environment <container-apps-env>
+#
+# Prerequisites:
+#   1. Azure Container Registry (ACR) with the image pushed
+#   2. Azure Container Apps Environment created
+#   3. App Registration in Azure AD (see README – Copilot Studio Setup)
+#
+# Replace all <PLACEHOLDER> values before deploying.
+
+location: germanywestcentral         # adjust to your preferred Azure region
+name: ibcs-feedback-api
+resourceGroup: <RESOURCE_GROUP>
+
+properties:
+  managedEnvironmentId: >-
+    /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>/providers/
+    Microsoft.App/managedEnvironments/<CONTAINER_APPS_ENV>
+
+  configuration:
+    ingress:
+      external: true                 # publicly reachable (required by Copilot Studio)
+      targetPort: 8000
+      transport: http
+      allowInsecure: false           # HTTPS only
+
+    secrets:
+      - name: openai-api-key
+        value: "$(AZURE_OPENAI_API_KEY)"   # inject via az CLI at deploy time
+
+    registries:
+      - server: <ACR_NAME>.azurecr.io
+        identity: system             # system-assigned managed identity → no stored credentials
+
+  template:
+    containers:
+      - name: ibcs-feedback-api
+        image: <ACR_NAME>.azurecr.io/ibcs-feedback-api:latest
+        resources:
+          cpu: 1.0
+          memory: 2Gi
+        env:
+          # Azure OpenAI
+          - name: AZURE_OPENAI_ENDPOINT
+            value: "https://<OPENAI_RESOURCE>.openai.azure.com/"
+          - name: AZURE_OPENAI_API_KEY
+            secretRef: openai-api-key
+          - name: AZURE_OPENAI_MODEL_NAME
+            value: "gpt-4o"
+          # Azure AD auth (required for Enterprise Copilot Studio)
+          - name: AZURE_AD_TENANT_ID
+            value: "<AAD_TENANT_ID>"
+          - name: AZURE_AD_CLIENT_ID
+            value: "<API_APP_REGISTRATION_CLIENT_ID>"
+          # Analysis settings
+          - name: ENABLE_VISUAL_ANALYSIS
+            value: "true"
+          - name: MAX_FILE_SIZE_MB
+            value: "20"
+          # API deployment URL (adds correct server URL to OpenAPI spec)
+          - name: API_BASE_URL
+            value: "https://ibcs-feedback-api.<ENV>.<REGION>.azurecontainerapps.io"
+          # Observability
+          - name: LOG_LEVEL
+            value: "INFO"
+          - name: ENVIRONMENT
+            value: "production"
+          - name: SERVICE_NAME
+            value: "ibcs-feedback-agent"
+          - name: SERVICE_VERSION
+            value: "1.0.0"
+        probes:
+          liveness:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+          readiness:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+
+    scale:
+      minReplicas: 1
+      maxReplicas: 4
+      rules:
+        - name: http-scaling
+          http:
+            metadata:
+              concurrentRequests: "10"   # scale out when > 10 concurrent requests
