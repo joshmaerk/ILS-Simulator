@@ -3,3 +3,12 @@ Lib/
 Scripts/
 pyvenv.cfg
 .idea/
+__pycache__/
+*.py[cod]
+.coverage
+htmlcov/
+coverage.xml
+*.egg-info/
+.venv/
+dist/
+build/
