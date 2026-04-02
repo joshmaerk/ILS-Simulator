@@ -116,10 +116,8 @@ jobs:
     name: "Deploy app → App Service (${{ inputs.environment }})"
     runs-on: ubuntu-latest
     # Deploy even if infra job is skipped; fails if infra job fails
-    needs: []
-    if: |
-      always() &&
-      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
+    needs: [deploy-infra]
+    if: ${{ always() && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') }}
     environment: ${{ inputs.environment }}
 
     steps:
