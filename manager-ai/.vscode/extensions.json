@@ -1,0 +1,39 @@
+{
+  "recommendations": [
+    // ── Python core ──────────────────────────────────────────────────────────
+    "ms-python.python",              // Python language support + debugger
+    "ms-python.vscode-pylance",      // Fast type checker & IntelliSense (Pylance)
+    "ms-python.debugpy",             // Python debugger (DAP)
+
+    // ── Code quality ─────────────────────────────────────────────────────────
+    "charliermarsh.ruff",            // Ruff linter + formatter
+    "ms-python.black-formatter",     // Black code formatter
+    "ms-python.mypy-type-checker",   // Mypy type checking in editor
+
+    // ── Azure ─────────────────────────────────────────────────────────────────
+    "ms-azuretools.vscode-bicep",    // Bicep IaC syntax, validation & snippets
+    "ms-vscode.azure-account",       // Azure account management
+
+    // ── GitHub ────────────────────────────────────────────────────────────────
+    "github.vscode-github-actions",  // Workflow YAML validation & run view
+    "github.vscode-pull-request-github", // PR management inline
+
+    // ── Git & productivity ───────────────────────────────────────────────────
+    "eamodio.gitlens",               // Git blame, history, lens
+    "mhutchie.git-graph",            // Git branch graph
+
+    // ── Editor quality of life ───────────────────────────────────────────────
+    "streetsidesoftware.code-spell-checker", // Spell checker (flags typos in code)
+    "aaron-bond.better-comments",    // Colour-coded comment categories
+    "christian-kohler.path-intellisense", // File path autocomplete
+    "gruntfuggly.todo-tree",         // Aggregates TODO/FIXME/HACK comments
+
+    // ── YAML & JSON ───────────────────────────────────────────────────────────
+    "redhat.vscode-yaml",            // YAML validation (GitHub Actions, pre-commit)
+    "zainchen.json"                  // JSON tools
+  ],
+
+  "unwantedRecommendations": [
+    "ms-python.pylint"               // Replaced by ruff
+  ]
+}

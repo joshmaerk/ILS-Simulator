@@ -1,0 +1,196 @@
+name: Manager-AI CI
+
+on:
+  push:
+    paths:
+      - "manager-ai/**"
+      - ".github/workflows/manager-ai-ci.yml"
+  pull_request:
+    paths:
+      - "manager-ai/**"
+      - ".github/workflows/manager-ai-ci.yml"
+
+# Cancel in-progress runs on the same branch when a new commit arrives
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: manager-ai
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 1: Lint  (gates typecheck + test)
+  # ──────────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (ruff + black)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-dev-${{ hashFiles('manager-ai/requirements.txt', 'manager-ai/requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-dev-
+            ${{ runner.os }}-pip-
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: ruff — lint
+        run: ruff check .
+
+      - name: ruff — format check
+        run: ruff format --check .
+
+      - name: black — format check
+        run: black --check .
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 2: Type check  (needs: lint)
+  # ──────────────────────────────────────────────────────────────────────────
+  typecheck:
+    name: Type check (mypy)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-all-${{ hashFiles('manager-ai/requirements.txt', 'manager-ai/requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-all-
+            ${{ runner.os }}-pip-
+
+      - name: Install all dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: mypy
+        run: python -m mypy . --config-file pyproject.toml
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 3: Tests  (needs: lint)
+  # ──────────────────────────────────────────────────────────────────────────
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      checks: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-all-${{ hashFiles('manager-ai/requirements.txt', 'manager-ai/requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-all-
+            ${{ runner.os }}-pip-
+
+      - name: Install all dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Create test results directory
+        run: mkdir -p test-results
+
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/unit \
+            --tb=short \
+            --junitxml=test-results/unit.xml \
+            --cov=. \
+            --cov-report=xml:test-results/coverage.xml \
+            --cov-report=term-missing \
+            --cov-omit="tests/*,infra/*"
+
+      - name: Run integration tests
+        # Integration tests use fully mocked Azure clients — safe in CI without live Azure
+        run: |
+          python -m pytest tests/integration \
+            --tb=short \
+            --junitxml=test-results/integration.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-py312
+          path: manager-ai/test-results/
+          retention-days: 14
+
+      - name: Publish test summary
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: manager-ai/test-results/*.xml
+          check_name: "Test Results"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 4: Bicep lint  (independent)
+  # ──────────────────────────────────────────────────────────────────────────
+  bicep-lint:
+    name: Bicep lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bicep CLI
+        run: |
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep
+          sudo mv ./bicep /usr/local/bin/bicep
+          bicep --version
+
+      - name: Lint main.bicep
+        working-directory: manager-ai/infra
+        run: bicep lint main.bicep --diagnostics-format sarif 2>/dev/null || bicep lint main.bicep
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Summary gate (required status check for branch protection)
+  # ──────────────────────────────────────────────────────────────────────────
+  ci-success:
+    name: CI passed
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, bicep-lint]
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" || \
+                "${{ needs.typecheck.result }}" != "success" || \
+                "${{ needs.test.result }}" != "success" || \
+                "${{ needs.bicep-lint.result }}" != "success" ]]; then
+            echo "One or more CI jobs failed."
+            exit 1
+          fi
+          echo "All CI checks passed."

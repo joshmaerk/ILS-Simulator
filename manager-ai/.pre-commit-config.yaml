@@ -1,0 +1,77 @@
+# pre-commit configuration for manager-ai
+# ─────────────────────────────────────────────────────────────────────────────
+# Install hooks (run from ILS-Simulator repo root):
+#   Windows PowerShell : .\scripts\install-hooks.ps1
+#   Windows CMD        : scripts\install-hooks.cmd
+#   Linux / WSL / macOS: bash scripts/install-hooks.sh
+#
+# Or manually (from manager-ai/ with conda env active):
+#   pre-commit install --hook-type pre-commit --hook-type pre-push
+# ─────────────────────────────────────────────────────────────────────────────
+
+default_language_version:
+  python: python3.12
+
+repos:
+  - repo: local
+    hooks:
+      # ── pre-commit: fast quality checks on staged files ───────────────────
+
+      - id: ruff-check
+        name: "ruff: lint"
+        description: Lint Python files with ruff (auto-fixes safe issues)
+        language: system
+        entry: ruff check
+        args: [--fix, --exit-non-zero-on-fix]
+        types: [python]
+        stages: [pre-commit]
+
+      - id: ruff-format
+        name: "ruff: format check"
+        description: Check formatting with ruff formatter
+        language: system
+        entry: ruff format
+        args: [--check]
+        types: [python]
+        stages: [pre-commit]
+
+      - id: black-check
+        name: "black: format check"
+        description: Check formatting with black
+        language: system
+        entry: black
+        args: [--check, --diff]
+        types: [python]
+        stages: [pre-commit]
+
+      - id: mypy-check
+        name: "mypy: type check"
+        description: Static type checking with mypy
+        language: system
+        entry: python -m mypy
+        args:
+          - --config-file
+          - pyproject.toml
+          - --no-error-summary
+        # mypy needs to see the whole package, not just staged files
+        pass_filenames: false
+        files: ^(agents|bot|config|graph|memory|orchestrator|tools)/
+        types: [python]
+        stages: [pre-commit]
+
+      # ── pre-push: unit test suite (no live Azure required) ────────────────
+
+      - id: unit-tests
+        name: "pytest: unit tests"
+        description: Run unit test suite before push (mocked Azure, no network needed)
+        language: system
+        entry: python -m pytest
+        args:
+          - tests/unit
+          - -x
+          - -q
+          - --no-header
+          - --tb=short
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

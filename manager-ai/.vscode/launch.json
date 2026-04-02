@@ -1,0 +1,99 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    // ── Run and debug the Teams bot locally ────────────────────────────────
+    {
+      "name": "Bot: Debug (local)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bot.app",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "ENVIRONMENT": "development"
+      },
+      "presentation": {
+        "group": "bot",
+        "order": 1
+      }
+    },
+
+    // ── Debug all tests ────────────────────────────────────────────────────
+    {
+      "name": "Pytest: All Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests",
+        "-v",
+        "--tb=short",
+        "--no-header"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "presentation": {
+        "group": "tests",
+        "order": 1
+      }
+    },
+
+    // ── Debug only unit tests ──────────────────────────────────────────────
+    {
+      "name": "Pytest: Unit Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/unit",
+        "-v",
+        "--tb=short",
+        "--no-header",
+        "-x"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "presentation": {
+        "group": "tests",
+        "order": 2
+      }
+    },
+
+    // ── Debug currently open test file ─────────────────────────────────────
+    {
+      "name": "Pytest: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "${file}",
+        "-v",
+        "--tb=short",
+        "--no-header",
+        "-x"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "presentation": {
+        "group": "tests",
+        "order": 3
+      }
+    }
+  ]
+}

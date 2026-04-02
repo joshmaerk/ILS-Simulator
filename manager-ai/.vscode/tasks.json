@@ -1,0 +1,198 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ── Dependencies ────────────────────────────────────────────────────────
+
+    {
+      "label": "Install: runtime deps",
+      "type": "shell",
+      "command": "pip install -r requirements.txt",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install: dev deps",
+      "type": "shell",
+      "command": "pip install -r requirements-dev.txt",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install: all deps",
+      "dependsOn": ["Install: runtime deps", "Install: dev deps"],
+      "group": "none",
+      "problemMatcher": []
+    },
+
+    // ── Git hooks ───────────────────────────────────────────────────────────
+
+    {
+      "label": "Hooks: install (PowerShell)",
+      "type": "shell",
+      "command": "..\\scripts\\install-hooks.ps1",
+      "options": { "cwd": "${workspaceFolder}" },
+      "windows": {
+        "command": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\install-hooks.ps1"
+      },
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Hooks: run all (pre-commit --all-files)",
+      "type": "shell",
+      "command": "pre-commit run --all-files --config .pre-commit-config.yaml",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+
+    // ── Linting & formatting ────────────────────────────────────────────────
+
+    {
+      "label": "Lint: ruff check",
+      "type": "shell",
+      "command": "ruff check .",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": {
+        "owner": "ruff",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+):\\s+(\\w+)\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    },
+    {
+      "label": "Lint: ruff fix",
+      "type": "shell",
+      "command": "ruff check . --fix",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Format: black",
+      "type": "shell",
+      "command": "black .",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Format: black check",
+      "type": "shell",
+      "command": "black --check .",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+
+    // ── Type checking ────────────────────────────────────────────────────────
+
+    {
+      "label": "Typecheck: mypy",
+      "type": "shell",
+      "command": "python -m mypy . --config-file pyproject.toml",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": {
+        "owner": "mypy",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.+):(\\d+):\\s+error:\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        }
+      }
+    },
+
+    // ── Tests ────────────────────────────────────────────────────────────────
+
+    {
+      "label": "Test: unit tests",
+      "type": "shell",
+      "command": "python -m pytest tests/unit -v --tb=short",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: all tests with coverage",
+      "type": "shell",
+      "command": "python -m pytest tests -v --tb=short --cov=. --cov-report=html --cov-report=term-missing --cov-omit=tests/*,infra/*",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: integration tests",
+      "type": "shell",
+      "command": "python -m pytest tests/integration -v --tb=short",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+
+    // ── CI gate (run all checks locally as CI would) ─────────────────────────
+
+    {
+      "label": "CI: full check (lint + typecheck + test)",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Lint: ruff check",
+        "Format: black check",
+        "Typecheck: mypy",
+        "Test: unit tests"
+      ],
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+
+    // ── Bot ──────────────────────────────────────────────────────────────────
+
+    {
+      "label": "Bot: start (local)",
+      "type": "shell",
+      "command": "python -m bot.app",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "PYTHONPATH": "${workspaceFolder}" }
+      },
+      "isBackground": true,
+      "group": "none",
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": {
+        "pattern": { "regexp": "." },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Manager-AI Bot started",
+          "endsPattern": "."
+        }
+      }
+    }
+  ]
+}

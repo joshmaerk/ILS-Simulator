@@ -1,0 +1,190 @@
+name: Manager-AI Deploy
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Currently: MANUAL trigger only (workflow_dispatch).
+# To enable automatic CD on push to main, uncomment the 'push' block below.
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
+      resource_group:
+        description: "Azure Resource Group name"
+        required: true
+        type: string
+      app_service_name:
+        description: "Azure App Service name"
+        required: true
+        type: string
+      deploy_infra:
+        description: "Also deploy Bicep infrastructure? (default: false)"
+        required: false
+        default: "false"
+        type: boolean
+
+  # ── Uncomment to enable automatic CD on push to main ──────────────────────
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "manager-ai/**"
+  #     - "!manager-ai/tests/**"
+  #     - "!manager-ai/.vscode/**"
+  #     - "!manager-ai/requirements-dev.txt"
+
+# OIDC token required — no stored Azure credentials needed
+permissions:
+  id-token: write
+  contents: read
+
+defaults:
+  run:
+    working-directory: manager-ai
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SETUP:
+# Before using this workflow, configure OIDC federation once in Azure Portal:
+#
+# 1. Create or use an existing App Registration in Azure AD
+# 2. Go to: App Registration → Certificates & secrets → Federated credentials
+#    → Add credential:
+#       Issuer  : https://token.actions.githubusercontent.com
+#       Subject : repo:joshmaerk/ILS-Simulator:ref:refs/heads/main
+#       Name    : github-actions-manager-ai
+# 3. Assign the App Registration the "Contributor" role on your Resource Group
+# 4. Add three GitHub Repository Secrets:
+#       AZURE_CLIENT_ID       = <App Registration Application (client) ID>
+#       AZURE_TENANT_ID       = <Azure AD Tenant ID>
+#       AZURE_SUBSCRIPTION_ID = <Azure Subscription ID>
+# ─────────────────────────────────────────────────────────────────────────────
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # (Optional) Deploy Bicep infrastructure
+  # Skipped by default — set deploy_infra=true in workflow_dispatch inputs
+  # ──────────────────────────────────────────────────────────────────────────
+  deploy-infra:
+    name: "Deploy Bicep infrastructure (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+    if: ${{ inputs.deploy_infra == true || inputs.deploy_infra == 'true' }}
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Bicep CLI
+        run: |
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep
+          sudo mv ./bicep /usr/local/bin/bicep
+
+      - name: Validate Bicep
+        working-directory: manager-ai/infra
+        run: |
+          az deployment group validate \
+            --resource-group "${{ inputs.resource_group }}" \
+            --template-file main.bicep \
+            --parameters environmentName="${{ inputs.environment }}"
+
+      - name: Deploy Bicep infrastructure
+        working-directory: manager-ai/infra
+        run: |
+          az deployment group create \
+            --resource-group "${{ inputs.resource_group }}" \
+            --template-file main.bicep \
+            --parameters environmentName="${{ inputs.environment }}" \
+            --mode Incremental \
+            --verbose
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Deploy application code to Azure App Service
+  # ──────────────────────────────────────────────────────────────────────────
+  deploy-app:
+    name: "Deploy app → App Service (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+    # Deploy even if infra job is skipped; fails if infra job fails
+    needs: [deploy-infra]
+    if: ${{ always() && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') }}
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-deploy-${{ hashFiles('manager-ai/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-deploy-
+
+      - name: Install runtime dependencies into package dir
+        # App Service expects dependencies in .python_packages/ for zip deploy
+        run: |
+          pip install -r requirements.txt \
+            --target=.python_packages/lib/site-packages \
+            --no-deps
+
+      - name: Build deployment zip
+        run: |
+          cd ..
+          zip -r manager-ai-deploy.zip manager-ai \
+            --exclude "manager-ai/.git*" \
+            --exclude "manager-ai/__pycache__/*" \
+            --exclude "manager-ai/*.pyc" \
+            --exclude "manager-ai/tests/*" \
+            --exclude "manager-ai/.vscode/*" \
+            --exclude "manager-ai/.env*" \
+            --exclude "manager-ai/requirements-dev.txt" \
+            --exclude "manager-ai/.pre-commit-config.yaml" \
+            --exclude "manager-ai/.gitignore" \
+            --exclude "manager-ai/infra/*"
+          echo "Zip size: $(du -sh manager-ai-deploy.zip | cut -f1)"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure App Service
+        run: |
+          az webapp deploy \
+            --resource-group "${{ inputs.resource_group }}" \
+            --name "${{ inputs.app_service_name }}" \
+            --src-path ../manager-ai-deploy.zip \
+            --type zip \
+            --async false \
+            --verbose
+
+      - name: Verify deployment (health check)
+        run: |
+          APP_URL=$(az webapp show \
+            --resource-group "${{ inputs.resource_group }}" \
+            --name "${{ inputs.app_service_name }}" \
+            --query "defaultHostName" -o tsv)
+          echo "App URL: https://$APP_URL"
+          sleep 10
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://$APP_URL/health")
+          echo "Health check status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "WARNING: Health check returned $HTTP_STATUS (may be starting up)"
+          fi

@@ -1,0 +1,40 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "${title}",
+      "weight": "Bolder",
+      "size": "Medium",
+      "wrap": true,
+      "isVisible": "${title != ''}"
+    },
+    {
+      "type": "TextBlock",
+      "text": "${response}",
+      "wrap": true,
+      "spacing": "Small"
+    },
+    {
+      "type": "TextBlock",
+      "text": "${attribution}",
+      "size": "Small",
+      "color": "Accent",
+      "isSubtle": true,
+      "wrap": true,
+      "isVisible": "${attribution != ''}",
+      "spacing": "Medium"
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Submit",
+      "title": "Weiterführende Frage stellen",
+      "data": {
+        "action": "followup"
+      }
+    }
+  ]
+}
