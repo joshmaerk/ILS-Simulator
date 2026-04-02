@@ -1,0 +1,216 @@
+{
+  // ── Workspace folders ──────────────────────────────────────────────────────
+  // ${workspaceFolder} in child settings refers to the manager-ai/ directory
+  "folders": [
+    {
+      "name": "manager-ai",
+      "path": "manager-ai"
+    }
+  ],
+
+  // ── Workspace-level settings ───────────────────────────────────────────────
+  "settings": {
+
+    // ── Terminal: Conda environment auto-activation ──────────────────────────
+    // All three profiles activate the 'manager-ai' conda env and open in
+    // the manager-ai/ workspace folder automatically.
+
+    // Default terminal on Windows
+    "terminal.integrated.defaultProfile.windows": "PowerShell (manager-ai)",
+
+    // Default terminal on Linux / WSL / macOS
+    "terminal.integrated.defaultProfile.linux": "bash (manager-ai)",
+    "terminal.integrated.defaultProfile.osx": "zsh (manager-ai)",
+
+    // Default CWD = the workspace folder (manager-ai/)
+    "terminal.integrated.cwd": "${workspaceFolder}",
+
+    // ── Windows terminal profiles ────────────────────────────────────────────
+    "terminal.integrated.profiles.windows": {
+
+      // PowerShell with conda env activated
+      "PowerShell (manager-ai)": {
+        "source": "PowerShell",
+        "args": [
+          "-NoExit",
+          "-Command",
+          "& { (& conda shell.powershell hook) | Out-String | Invoke-Expression; conda activate manager-ai; Set-Location '${workspaceFolder}' }"
+        ],
+        "icon": "terminal-powershell",
+        "color": "terminal.ansiBlue"
+      },
+
+      // Command Prompt (cmd.exe) with conda env activated
+      "Command Prompt (manager-ai)": {
+        "path": "${env:COMSPEC}",
+        "args": [
+          "/K",
+          "conda activate manager-ai && cd /d \"${workspaceFolder}\""
+        ],
+        "icon": "terminal-cmd",
+        "color": "terminal.ansiYellow"
+      },
+
+      // Git Bash with conda env (useful on Windows for shell scripts)
+      "Git Bash (manager-ai)": {
+        "source": "Git Bash",
+        "args": [
+          "--login",
+          "-i",
+          "-c",
+          "conda activate manager-ai 2>/dev/null; cd '${workspaceFolder}'; exec bash"
+        ],
+        "icon": "terminal",
+        "color": "terminal.ansiGreen"
+      }
+    },
+
+    // ── Linux / macOS terminal profiles ─────────────────────────────────────
+    "terminal.integrated.profiles.linux": {
+      "bash (manager-ai)": {
+        "path": "/bin/bash",
+        "args": [
+          "--login",
+          "-i",
+          "-c",
+          "conda activate manager-ai 2>/dev/null; cd '${workspaceFolder}'; exec bash"
+        ],
+        "icon": "terminal-bash"
+      }
+    },
+    "terminal.integrated.profiles.osx": {
+      "zsh (manager-ai)": {
+        "path": "/bin/zsh",
+        "args": [
+          "-l",
+          "-c",
+          "conda activate manager-ai 2>/dev/null; cd '${workspaceFolder}'; exec zsh"
+        ],
+        "icon": "terminal"
+      }
+    },
+
+    // ── Python interpreter (conda env) ───────────────────────────────────────
+    // VSCode picks up the active conda env automatically when the terminal
+    // activates it. The path below is the fallback for the interpreter picker.
+    // Windows : "%USERPROFILE%\\miniconda3\\envs\\manager-ai\\python.exe"
+    // Linux   : "~/miniconda3/envs/manager-ai/bin/python"
+    "python.condaPath": "conda",
+
+    // ── Ruff ─────────────────────────────────────────────────────────────────
+    "ruff.enable": true,
+    "ruff.configuration": "${workspaceFolder}/pyproject.toml",
+
+    // ── Black ─────────────────────────────────────────────────────────────────
+    "black-formatter.args": ["--config", "${workspaceFolder}/pyproject.toml"],
+
+    // ── Mypy ──────────────────────────────────────────────────────────────────
+    "mypy-type-checker.args": [
+      "--config-file",
+      "${workspaceFolder}/pyproject.toml"
+    ],
+
+    // ── Python testing (pytest) ───────────────────────────────────────────────
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestPath": "pytest",
+    "python.testing.pytestArgs": ["tests", "--tb=short", "-v"],
+    "python.testing.cwd": "${workspaceFolder}",
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+
+    // ── Editor ────────────────────────────────────────────────────────────────
+    "editor.formatOnSave": true,
+    "editor.rulers": [100],
+    "editor.tabSize": 4,
+
+    "[python]": {
+      "editor.defaultFormatter": "ms-python.black-formatter",
+      "editor.formatOnSave": true,
+      "editor.codeActionsOnSave": {
+        "source.fixAll.ruff": "explicit",
+        "source.organizeImports.ruff": "explicit"
+      }
+    },
+
+    "[bicep]": {
+      "editor.defaultFormatter": "ms-azuretools.vscode-bicep"
+    },
+
+    "[yaml]": {
+      "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+
+    // ── File explorer ─────────────────────────────────────────────────────────
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/*.pyc": true,
+      "**/.pytest_cache": true,
+      "**/.mypy_cache": true,
+      "**/.ruff_cache": true,
+      "**/htmlcov": true,
+      "**/.coverage": true
+    },
+
+    // ── GitHub Actions pinned workflows ───────────────────────────────────────
+    "github-actions.workflows.pinned.workflows": [
+      ".github/workflows/manager-ai-ci.yml",
+      ".github/workflows/manager-ai-deploy.yml"
+    ]
+  },
+
+  // ── Recommended extensions ─────────────────────────────────────────────────
+  "extensions": {
+    "recommendations": [
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "ms-python.debugpy",
+      "charliermarsh.ruff",
+      "ms-python.black-formatter",
+      "ms-python.mypy-type-checker",
+      "ms-azuretools.vscode-bicep",
+      "ms-vscode.azure-account",
+      "github.vscode-github-actions",
+      "github.vscode-pull-request-github",
+      "eamodio.gitlens",
+      "mhutchie.git-graph",
+      "streetsidesoftware.code-spell-checker",
+      "aaron-bond.better-comments",
+      "gruntfuggly.todo-tree",
+      "redhat.vscode-yaml",
+      "christian-kohler.path-intellisense"
+    ],
+    "unwantedRecommendations": [
+      "ms-python.pylint"
+    ]
+  },
+
+  // ── Launch configurations ─────────────────────────────────────────────────
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Bot: Debug (local)",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "bot.app",
+        "cwd": "${workspaceFolder:manager-ai}",
+        "envFile": "${workspaceFolder:manager-ai}/.env",
+        "console": "integratedTerminal",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder:manager-ai}",
+          "ENVIRONMENT": "development"
+        }
+      },
+      {
+        "name": "Pytest: Unit Tests",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "pytest",
+        "args": ["tests/unit", "-v", "--tb=short", "-x"],
+        "cwd": "${workspaceFolder:manager-ai}",
+        "console": "integratedTerminal",
+        "env": { "PYTHONPATH": "${workspaceFolder:manager-ai}" }
+      }
+    ]
+  }
+}

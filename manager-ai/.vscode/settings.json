@@ -1,0 +1,111 @@
+{
+  // ── Python interpreter ────────────────────────────────────────────────────
+  // Uses the active conda env (CONDA_PREFIX is set when env is active).
+  // Fallback paths if CONDA_PREFIX is not set:
+  //   Windows : "%USERPROFILE%\\miniconda3\\envs\\manager-ai\\python.exe"
+  //   Linux   : "~/miniconda3/envs/manager-ai/bin/python"
+  "python.defaultInterpreterPath": "${env:CONDA_PREFIX}/bin/python",
+  "python.condaPath": "conda",
+
+  // ── Editor: formatting & code actions ────────────────────────────────────
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+  // ── Ruff ──────────────────────────────────────────────────────────────────
+  "ruff.enable": true,
+  "ruff.lint.run": "onSave",
+  "ruff.organizeImports": true,
+  "ruff.fixAll": true,
+  "ruff.configuration": "${workspaceFolder}/pyproject.toml",
+
+  // ── Black ─────────────────────────────────────────────────────────────────
+  "black-formatter.args": ["--config", "${workspaceFolder}/pyproject.toml"],
+
+  // ── Mypy ──────────────────────────────────────────────────────────────────
+  "mypy-type-checker.args": [
+    "--config-file",
+    "${workspaceFolder}/pyproject.toml"
+  ],
+  "mypy-type-checker.reportingScope": "workspace",
+
+  // ── Python testing (pytest) ───────────────────────────────────────────────
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestPath": "pytest",
+  "python.testing.pytestArgs": [
+    "tests",
+    "--tb=short",
+    "-v"
+  ],
+  "python.testing.cwd": "${workspaceFolder}",
+  "python.testing.autoTestDiscoverOnSaveEnabled": true,
+
+  // ── Python analysis (Pylance) ─────────────────────────────────────────────
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}"
+  ],
+
+  // ── File explorer ─────────────────────────────────────────────────────────
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true,
+    "**/htmlcov": true
+  },
+  "files.watcherExclude": {
+    "**/__pycache__/**": true,
+    "**/.pytest_cache/**": true
+  },
+
+  // ── Editor cosmetics ──────────────────────────────────────────────────────
+  "editor.rulers": [100],
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[bicep]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-bicep"
+  },
+
+  // ── Bicep ─────────────────────────────────────────────────────────────────
+  "bicep.enableOutputTimestamps": false,
+
+  // ── GitHub Actions ────────────────────────────────────────────────────────
+  "github-actions.workflows.pinned.workflows": [
+    ".github/workflows/manager-ai-ci.yml",
+    ".github/workflows/manager-ai-deploy.yml"
+  ],
+
+  // ── Spell checker (cspell) ────────────────────────────────────────────────
+  "cSpell.words": [
+    "aiohttp",
+    "asyncio",
+    "botbuilder",
+    "cosmos",
+    "foundry",
+    "msgraph",
+    "openai",
+    "orchestrator",
+    "pydantic",
+    "pytest",
+    "waitress"
+  ]
+}
